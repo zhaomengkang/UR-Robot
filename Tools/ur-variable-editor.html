@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>UR Variable Editor</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 20px; background: #f4f7f6; color: #333; margin: 0; }
+        .container { max-width: 1200px; margin: 20px auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); position: relative; }
+        
+        .header-area { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
+        h2 { color: #0056b3; margin: 0; font-size: 20px; }
+        .lang-btn { background: #6c757d; padding: 6px 12px; font-size: 13px; }
+        .lang-btn:hover { background: #5a6268; }
+        
+        .control-group { margin-bottom: 20px; padding: 15px; background: #eef2f5; border-radius: 5px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
+        .status { font-weight: bold; color: #28a745; font-size: 14px; }
+        .error { color: #dc3545; }
+        
+        .layout { display: flex; gap: 20px; align-items: flex-start; }
+        .left-panel { flex: 6; }
+        .right-panel { flex: 4; background: #2d2d2d; color: #ccc; border-radius: 6px; padding: 15px; position: sticky; top: 20px; }
+        
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; vertical-align: top; }
+        th { background-color: #0056b3; color: white; position: sticky; top: 0; }
+        input[type="text"] { width: 100%; padding: 6px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 3px; font-family: monospace; font-size: 13px; }
+        
+        textarea { width: 100%; height: 180px; background: #1e1e1e; color: #9cdcfe; border: 1px solid #444; padding: 10px; font-family: 'Consolas', monospace; font-size: 13px; border-radius: 4px; resize: vertical; box-sizing: border-box; }
+        
+        button { padding: 8px 16px; background: #0056b3; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; transition: 0.2s; white-space: nowrap; }
+        button:hover { background: #004494; }
+        button.danger { background: #d9534f; }
+        button.run-btn { background: #28e745; color: #000; width: 100%; margin-top: 10px; font-weight: bold; }
+        button.run-btn:hover { background: #21c53a; }
+        button.help-btn { background: #17a2b8; width: 100%; margin-top: 10px; }
+        button.help-btn:hover { background: #138496; }
+        
+        /* 底部操作栏布局 */
+        .action-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; flex-wrap: wrap; gap: 10px; }
+        .action-group { display: flex; gap: 10px; align-items: center; }
+        
+        .help-doc { background: #3c3c3c; padding: 10px; border-radius: 4px; margin-top: 15px; font-size: 12px; line-height: 1.6; }
+        .help-doc h4 { color: #fff; margin: 0 0 8px 0; font-size: 13px; }
+        .help-doc code { background: #222; padding: 2px 6px; border-radius: 3px; color: #ce9178; font-family: monospace; }
+        .help-doc ul { margin: 0; padding-left: 20px; color: #a9a9a9; }
+        .help-doc li { margin-bottom: 5px; }
+
+        /* 模态框样式 */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: #fff; width: 800px; max-width: 90%; border-radius: 8px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); max-height: 85vh; display: flex; flex-direction: column; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; padding-bottom: 10px; margin-bottom: 15px; }
+        .modal-header h3 { margin: 0; color: #0056b3; }
+        .modal-close { font-size: 24px; cursor: pointer; color: #888; background: none; border: none; padding: 0; }
+        .modal-close:hover { color: #333; }
+        .modal-body { overflow-y: auto; flex: 1; }
+        
+        /* 折叠面板样式 */
+        details { background: #f8f9fa; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 10px; padding: 10px; }
+        summary { cursor: pointer; font-weight: bold; color: #0056b3; outline: none; user-select: none; }
+        summary:hover { color: #004494; }
+        pre { background: #1e1e1e; color: #9cdcfe; padding: 15px; border-radius: 5px; overflow-x: auto; font-family: 'Consolas', monospace; font-size: 13px; margin-top: 10px; margin-bottom: 5px; }
+        
+        .copy-btn { background: #28a745; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+        .copy-btn:hover { background: #218838; }
+
+        /* 勾选框样式 */
+        .checkbox-label { display: flex; align-items: center; gap: 5px; font-size: 13px; color: #333; cursor: pointer; user-select: none; white-space: nowrap; }
+        .checkbox-label input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+
+        /* 配置名输入框 */
+        .config-name-box { display: flex; align-items: center; gap: 5px; font-size: 13px; color: #333; }
+        .config-name-box input { width: 120px; padding: 6px; border: 1px solid #ccc; border-radius: 3px; font-family: monospace; color: #0056b3; font-weight: bold; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header-area">
+        <h2 data-i18n="title">🤖 UR Variable Editor</h2>
+        <button class="lang-btn" onclick="toggleLanguage()" id="langBtn">EN / 中文</button>
+    </div>
+
+    <div class="control-group">
+        <input type="file" id="fileInput" accept=".variables">
+        <div class="status" id="status" data-i18n="statusNoFile">未选择文件 (可直接生成)</div>
+    </div>
+
+    <div id="editorArea">
+        <div class="layout">
+            <div class="left-panel">
+                <table id="varTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 30%;" data-i18n="thName">变量名</th>
+                            <th style="width: 60%;" data-i18n="thValue">变量值</th>
+                            <th style="width: 10%;" data-i18n="thAction">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+                
+                <!-- 底部操作栏 -->
+                <div class="action-bar">
+                    <div class="action-group">
+                        <button onclick="addRow()" data-i18n="btnAdd">➕ 添加单行</button>
+                        <button onclick="clearTable()" class="danger" data-i18n="btnClear">🗑️ 清空</button>
+                    </div>
+                    
+                    <div class="action-group">
+                        <!-- 仅在无文件时显示此输入框 -->
+                        <div class="config-name-box" id="configNameBox" style="display: flex;">
+                            <span data-i18n="fileNameLabel">文件名:</span>
+                            <input type="text" id="configNameInput" value="default" placeholder="default">
+                            <span>.variables</span>
+                        </div>
+
+                        <label class="checkbox-label" title="勾选后，点击保存时自动替换为当前系统时间" data-i18n-title="updateDateTitle">
+                            <input type="checkbox" id="updateTimestampCheckbox" checked>
+                            <span data-i18n="updateDateLabel">🕒 更新日期</span>
+                        </label>
+                        <button onclick="saveAndDownload()" style="background: #28a745;" data-i18n="btnSave">💾 保存并下载</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="right-panel">
+                <textarea id="jsCode" spellcheck="false" placeholder="在此输入 JavaScript 代码..." data-i18n-placeholder="jsPlaceholder"></textarea>
+                
+                <button class="run-btn" onclick="executeJs()" data-i18n="btnRun">▶ 执行代码生成</button>
+                <button class="help-btn" onclick="showHelpModal()" data-i18n="btnHelp">💡 查看示例代码</button>
+                
+                <div id="jsError" class="error" style="margin-top: 5px; font-size: 13px;"></div>
+
+                <div class="help-doc">
+                    <h4 data-i18n="helpTitle">📖 基础说明</h4>
+                    <ul>
+                        <li data-i18n="helpDesc1">代码必须 return 一个包含 {name, value} 的数组对象。</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 模态框 -->
+<div id="helpModal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 data-i18n="modalTitle">💡 JS 生成示例代码</h3>
+            <button class="modal-close" onclick="closeHelpModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            
+            <!-- 示例 1：基础标量 -->
+            <details>
+                <summary data-i18n="ex1Title">🔤 1. 基础标量 (String/Bool/Int/Float/Pose)</summary>
+                <pre id="code1">return [
+    { name: "MyBool",   value: "True" },
+    { name: "MyInt",    value: "123" },
+    { name: "MyFloat",  value: "3.14159" },
+    { name: "MyString", value: "\"Hello UR\"" },
+    { name: "HomePose", value: "p[0.1, -0.2, 0.3, 0, 0, 0]" }
+];</pre>
+                <button class="copy-btn" onclick="copyCode('code1')" data-i18n="btnCopy">📋 复制代码</button>
+            </details>
+
+            <!-- 示例 2：基础数组 -->
+            <details>
+                <summary data-i18n="ex2Title">📦 2. 基础数组 (Bool/Int/Float)</summary>
+                <pre id="code2">// 快捷生成数组字符串
+const makeBool  = (len) => "[" + Array(len).fill("False").join(",") + "]";
+const makeInt   = (len) => "[" + Array(len).fill("0").join(",") + "]";
+const makeFloat = (len) => "[" + Array(len).fill("0.0").join(",") + "]";
+
+return [
+    { name: "DIN",      value: makeBool(64) },
+    { name: "DOUT",     value: makeBool(64) },
+    { name: "INTIN",    value: makeInt(24) },
+    { name: "INTOUT",   value: makeInt(24) },
+    { name: "FLOATIN",  value: makeFloat(24) },
+    { name: "FLOATOUT", value: makeFloat(24) }
+];</pre>
+                <button class="copy-btn" onclick="copyCode('code2')" data-i18n="btnCopy">📋 复制代码</button>
+            </details>
+
+            <!-- 示例 3：结构体 -->
+            <details>
+                <summary data-i18n="ex3Title">🏗️ 3. 结构体 (Struct)</summary>
+                <pre id="code3">return [
+    // 注意：结构体内的字符串需要转义 \"text\"
+    { name: "RobotStatus", value: "struct(is_ready=True, error_code=0, weight=1.25)" },
+    { name: "RobotConfig", value: "struct(name=\"UR5e\", pose=p[0,0,0,0,0,0], active=False)" }
+];</pre>
+                <button class="copy-btn" onclick="copyCode('code3')" data-i18n="btnCopy">📋 复制代码</button>
+            </details>
+
+            <!-- 示例 4：矩阵 -->
+            <details>
+                <summary data-i18n="ex4Title">🔢 4. 矩阵 (Matrix)</summary>
+                <pre id="code4">return [
+    // 矩阵使用双层方括号 [[...], [...]]
+    { name: "IdentityMatrix", value: "[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]" },
+    { name: "TransformMatrix", value: "[[1.0,0.0,0.0,0.1], [0.0,1.0,0.0,0.2], [0.0,0.0,1.0,0.3], [0.0,0.0,0.0,1.0]]" }
+];</pre>
+                <button class="copy-btn" onclick="copyCode('code4')" data-i18n="btnCopy">📋 复制代码</button>
+            </details>
+
+            <!-- 示例 5：循环批量生成 -->
+            <details>
+                <summary data-i18n="ex5Title">🔄 5. 循环批量生成 (高级)</summary>
+                <pre id="code5">let result = [];
+
+// 利用 JS 循环，批量生成 10 个点位和结构体
+for (let i = 1; i <= 10; i++) {
+    result.push({ 
+        name: "Point_" + i, 
+        value: "p[" + (i * 0.1) + ", 0.0, 0.5, 0, 0, 0]" 
+    });
+    
+    // 生成结构体，包含动态的序号和布尔值
+    let isOdd = (i % 2 !== 0) ? "True" : "False";
+    result.push({
+        name: "Config_" + i,
+        value: "struct(id=" + i + ", is_odd=" + isOdd + ")"
+    });
+}
+
+// 补充生成 50 个布尔值的数组
+const makeBool50 = "[" + Array(50).fill("False").join(",") + "]";
+result.push({ name: "LargeBoolArray", value: makeBool50 });
+
+return result;</pre>
+                <button class="copy-btn" onclick="copyCode('code5')" data-i18n="btnCopy">📋 复制代码</button>
+            </details>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- 国际化字典 ---
+    const i18n = {
+        zh: {
+            title: "🤖 UR Variable 变量编辑器",
+            statusNoFile: "未选择文件 (可直接生成)",
+            thName: "变量名",
+            thValue: "变量值", // 已精简
+            thAction: "操作",
+            btnAdd: "➕ 添加单行",
+            btnClear: "🗑️ 清空",
+            fileNameLabel: "文件名:",
+            updateDateLabel: "🕒 更新日期",
+            updateDateTitle: "勾选后，点击保存时自动替换为当前系统时间",
+            btnSave: "💾 保存并下载",
+            jsPlaceholder: "在此输入 JavaScript 代码...",
+            btnRun: "▶ 执行代码生成",
+            btnHelp: "💡 查看示例代码",
+            helpTitle: "📖 基础说明",
+            helpDesc1: "代码必须 return 一个包含 {name, value} 的数组对象。",
+            modalTitle: "💡 JS 生成示例代码",
+            ex1Title: "🔤 1. 基础标量 (String/Bool/Int/Float/Pose)",
+            ex2Title: "📦 2. 基础数组 (Bool/Int/Float)",
+            ex3Title: "🏗️ 3. 结构体 (Struct)",
+            ex4Title: "🔢 4. 矩阵 (Matrix)",
+            ex5Title: "🔄 5. 循环批量生成 (高级)",
+            btnCopy: "📋 复制代码",
+            statusParsed: "✅ 已加载: ",
+            statusParsing: "正在解析...",
+            statusErr: "❌ 错误：",
+            statusPacking: "正在打包...",
+            statusSaved: "✅ 保存成功！(已更新时间)",
+            statusSavedNoTime: "✅ 保存成功！",
+            statusAdded: "✅ 成功追加 {count} 个变量！",
+            statusCleared: "确定清空表格？",
+            statusCopied: "✅ 已复制!"
+        },
+        en: {
+            title: "🤖 UR Variable Editor",
+            statusNoFile: "No file selected (can generate directly)",
+            thName: "Variable Name",
+            thValue: "Value", // 已精简
+            thAction: "Action",
+            btnAdd: "➕ Add Row",
+            btnClear: "🗑️ Clear",
+            fileNameLabel: "File Name:",
+            updateDateLabel: "🕒 Update Date",
+            updateDateTitle: "If checked, replace with current time on save",
+            btnSave: "💾 Save & Download",
+            jsPlaceholder: "Enter JavaScript code here...",
+            btnRun: "▶ Execute & Generate",
+            btnHelp: "💡 View Examples",
+            helpTitle: "📖 Basic Instructions",
+            helpDesc1: "Code must return an array of objects containing {name, value}.",
+            modalTitle: "💡 JS Code Examples",
+            ex1Title: "🔤 1. Basic Scalars (String/Bool/Int/Float/Pose)",
+            ex2Title: "📦 2. Basic Arrays (Bool/Int/Float)",
+            ex3Title: "🏗️ 3. Structs",
+            ex4Title: "🔢 4. Matrices",
+            ex5Title: "🔄 5. Loop Generation (Advanced)",
+            btnCopy: "📋 Copy Code",
+            statusParsed: "✅ Loaded: ",
+            statusParsing: "Parsing...",
+            statusErr: "❌ Error: ",
+            statusPacking: "Packing...",
+            statusSaved: "✅ Saved! (Date Updated)",
+            statusSavedNoTime: "✅ Saved!",
+            statusAdded: "✅ Successfully added {count} variables!",
+            statusCleared: "Are you sure you want to clear the table?",
+            statusCopied: "✅ Copied!"
+        }
+    };
+
+    let currentLang = "zh";
+
+    // 初始化语言
+    function initLanguage() {
+        const browserLang = navigator.language || navigator.userLanguage;
+        if (!browserLang.toLowerCase().startsWith("zh")) {
+            currentLang = "en";
+        }
+        applyLanguage();
+    }
+
+    // 应用语言
+    function applyLanguage() {
+        const dict = i18n[currentLang];
+        
+        // 遍历所有带有 data-i18n 属性的元素
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            if (dict[key]) {
+                el.innerHTML = dict[key]; 
+            }
+        });
+
+        // 遍历带有 data-i18n-placeholder 的输入框
+        document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+            const key = el.getAttribute('data-i18n-placeholder');
+            if (dict[key]) {
+                el.placeholder = dict[key];
+            }
+        });
+
+        // 遍历带有 data-i18n-title 的元素
+        document.querySelectorAll('[data-i18n-title]').forEach(el => {
+            const key = el.getAttribute('data-i18n-title');
+            if (dict[key]) {
+                el.title = dict[key];
+            }
+        });
+
+        // 更新 HTML lang 属性
+        document.documentElement.lang = currentLang === "zh" ? "zh-CN" : "en";
+        
+        // 更新删除按钮的文字
+        document.querySelectorAll('#varTable tbody tr td:last-child button').forEach(btn => {
+            btn.innerText = currentLang === "zh" ? "删除" : "Del";
+        });
+    }
+
+    // 切换语言
+    function toggleLanguage() {
+        currentLang = currentLang === "zh" ? "en" : "zh";
+        applyLanguage();
+    }
+
+    // 初始化
+    document.addEventListener("DOMContentLoaded", () => {
+        initLanguage();
+    });
+
+    // --- 核心业务逻辑 ---
+    let originalFileName = "";
+    let originalXmlString = "";
+    let originalTimestamp = "";
+
+    document.getElementById('editorArea').style.display = 'block';
+    document.getElementById('fileInput').addEventListener('change', handleFile);
+
+    async function decompressGzip(arrayBuffer) {
+        const ds = new DecompressionStream("gzip");
+        const stream = new Blob([arrayBuffer]).stream().pipeThrough(ds);
+        return await new Response(stream).text();
+    }
+
+    async function compressGzip(str) {
+        const cs = new CompressionStream("gzip");
+        const stream = new Blob([str]).stream().pipeThrough(cs);
+        return await new Response(stream).arrayBuffer();
+    }
+
+    async function handleFile(event) {
+        const file = event.target.files[0];
+        const dict = i18n[currentLang];
+        
+        if (!file) {
+            originalFileName = "";
+            originalXmlString = "";
+            document.getElementById('configNameBox').style.display = 'flex';
+            document.getElementById('varTable').querySelector('tbody').innerHTML = '';
+            updateStatus(dict.statusNoFile, false);
+            return;
+        }
+
+        originalFileName = file.name;
+        updateStatus(dict.statusParsing, false);
+
+        try {
+            const buffer = await file.arrayBuffer();
+            try {
+                originalXmlString = await decompressGzip(buffer);
+                if (!originalXmlString.includes("<InstallationVariables")) {
+                    throw new Error("Invalid variables file");
+                }
+            } catch (e) {
+                const textDecoder = new TextDecoder("utf-8");
+                originalXmlString = textDecoder.decode(buffer);
+            }
+
+            if (!originalXmlString.includes("<InstallationVariables")) {
+                throw new Error("Cannot find InstallationVariables node");
+            }
+
+            parseXMLToTable(originalXmlString);
+            
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(originalXmlString, "text/xml");
+            originalTimestamp = xmlDoc.documentElement.getAttribute('timestamp') || getCurrentTimestamp();
+
+            document.getElementById('configNameBox').style.display = 'none';
+            updateStatus(`${dict.statusParsed}${file.name}`, false);
+
+        } catch (error) {
+            console.error(error);
+            updateStatus(dict.statusErr + error.message, true);
+            originalFileName = "";
+            originalXmlString = "";
+            document.getElementById('configNameBox').style.display = 'flex';
+        }
+    }
+
+    function parseXMLToTable(xmlStr) {
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlStr, "text/xml");
+        
+        if (xmlDoc.getElementsByTagName("parsererror").length > 0) {
+            throw new Error("XML parse error");
+        }
+
+        const vars = xmlDoc.getElementsByTagName("variable");
+        const tbody = document.querySelector("#varTable tbody");
+        tbody.innerHTML = "";
+
+        for (let i = 0; i < vars.length; i++) {
+            const name = vars[i].getAttribute('name') || '';
+            const value = vars[i].getAttribute('value') || '';
+            addRow(name, value);
+        }
+    }
+
+    function addRow(name = '', value = '') {
+        const tbody = document.querySelector("#varTable tbody");
+        const tr = document.createElement("tr");
+
+        const tdName = document.createElement("td");
+        const inputName = document.createElement("input");
+        inputName.type = "text";
+        inputName.value = name;
+        inputName.className = "var-name";
+        tdName.appendChild(inputName);
+        tr.appendChild(tdName);
+
+        const tdValue = document.createElement("td");
+        const inputValue = document.createElement("input");
+        inputValue.type = "text";
+        inputValue.value = value;
+        inputValue.className = "var-value";
+        tdValue.appendChild(inputValue);
+        tr.appendChild(tdValue);
+
+        const tdAct = document.createElement("td");
+        const btnDel = document.createElement("button");
+        btnDel.innerText = currentLang === "zh" ? "删除" : "Del";
+        btnDel.className = "danger";
+        btnDel.style.padding = "4px 8px";
+        btnDel.onclick = () => tr.remove();
+        tdAct.appendChild(btnDel);
+        tr.appendChild(tdAct);
+
+        tbody.appendChild(tr);
+    }
+
+    function clearTable() {
+        const dict = i18n[currentLang];
+        if(confirm(dict.statusCleared)) document.querySelector("#varTable tbody").innerHTML = "";
+    }
+
+    function executeJs() {
+        const code = document.getElementById('jsCode').value;
+        const errorDiv = document.getElementById('jsError');
+        errorDiv.innerText = "";
+        
+        if (!code.trim()) return;
+
+        try {
+            const func = new Function(code);
+            const result = func();
+
+            if (!Array.isArray(result)) throw new Error("Code must return an array.");
+
+            let count = 0;
+            result.forEach(item => {
+                if (item.name !== undefined && item.value !== undefined) {
+                    addRow(item.name, String(item.value));
+                    count++;
+                }
+            });
+            
+            const dict = i18n[currentLang];
+            updateStatus(dict.statusAdded.replace("{count}", count), false);
+            document.getElementById('jsCode').value = ""; 
+        } catch (error) {
+            console.error(error);
+            errorDiv.innerText = "Error: " + error.message;
+        }
+    }
+
+    function getCurrentTimestamp() {
+        const now = new Date();
+        const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        
+        const day = days[now.getDay()];
+        const month = months[now.getMonth()];
+        const date = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        const year = now.getFullYear();
+        
+        return `${day} ${month} ${date} ${hours}:${minutes}:${seconds} CST ${year}`;
+    }
+
+    async function saveAndDownload() {
+        const dict = i18n[currentLang];
+        updateStatus(dict.statusPacking, false);
+
+        try {
+            let xmlDoc;
+            let root;
+            let parser = new DOMParser();
+
+            if (!originalXmlString) {
+                const newXmlStr = `<?xml version="1.0" encoding="UTF-8"?>\n<InstallationVariables timestamp="${getCurrentTimestamp()}"></InstallationVariables>`;
+                xmlDoc = parser.parseFromString(newXmlStr, "text/xml");
+                root = xmlDoc.documentElement;
+            } else {
+                xmlDoc = parser.parseFromString(originalXmlString, "text/xml");
+                root = xmlDoc.documentElement;
+            }
+
+            const shouldUpdate = document.getElementById('updateTimestampCheckbox').checked;
+            if (shouldUpdate) {
+                root.setAttribute('timestamp', getCurrentTimestamp());
+            }
+
+            const oldVars = xmlDoc.getElementsByTagName("variable");
+            Array.from(oldVars).forEach(v => v.parentNode.removeChild(v));
+
+            const rows = document.querySelectorAll("#varTable tbody tr");
+            rows.forEach(row => {
+                const name = row.querySelector(".var-name").value.trim();
+                if (!name) return;
+                const value = row.querySelector(".var-value").value.trim();
+
+                const varNode = xmlDoc.createElement("variable");
+                varNode.setAttribute("name", name);
+                varNode.setAttribute("value", value);
+                varNode.setAttribute("favourite", "false"); 
+                root.appendChild(varNode);
+            });
+
+            const serializer = new XMLSerializer();
+            let newXmlString = serializer.serializeToString(xmlDoc);
+            
+            newXmlString = newXmlString.replace(/<variable/g, '\n  <variable');
+            newXmlString = newXmlString.replace(/<\/InstallationVariables>/g, '\n</InstallationVariables>');
+            if (!newXmlString.startsWith('<?xml')) {
+                newXmlString = '<?xml version="1.0" encoding="UTF-8"?>\n' + newXmlString;
+            }
+
+            const compressedBuffer = await compressGzip(newXmlString);
+            
+            let downloadFileName = originalFileName;
+            if (!downloadFileName) {
+                let configName = document.getElementById('configNameInput').value.trim();
+                if (!configName) configName = "default";
+                configName = configName.replace(/\.variables$/i, "");
+                downloadFileName = configName + ".variables";
+            }
+
+            triggerDownload(new Blob([compressedBuffer], { type: "application/octet-stream" }), downloadFileName);
+            
+            updateStatus(shouldUpdate ? dict.statusSaved : dict.statusSavedNoTime, false);
+
+        } catch (error) {
+            console.error(error);
+            updateStatus(dict.statusErr + error.message, true);
+        }
+    }
+
+    function triggerDownload(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    function updateStatus(msg, isError) {
+        const el = document.getElementById('status');
+        el.innerText = msg;
+        el.className = isError ? "status error" : "status";
+    }
+
+    // 模态框控制
+    function showHelpModal() {
+        document.getElementById('helpModal').style.display = 'flex';
+    }
+
+    function closeHelpModal() {
+        document.getElementById('helpModal').style.display = 'none';
+    }
+
+    document.getElementById('helpModal').addEventListener('click', function(e) {
+        if (e.target === this) closeHelpModal();
+    });
+
+    // 复制代码
+    function copyCode(elementId) {
+        const codeText = document.getElementById(elementId).innerText;
+        navigator.clipboard.writeText(codeText).then(() => {
+            const btn = event.target;
+            const originalText = btn.innerText;
+            btn.innerText = i18n[currentLang].statusCopied;
+            setTimeout(() => { btn.innerText = originalText; }, 2000);
+        });
+    }
+</script>
+</body>
+</html>
